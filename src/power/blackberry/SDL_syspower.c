@@ -18,36 +18,28 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
+#include "SDL_config.h"
 
-#ifndef _SDL_config_h
-#define _SDL_config_h
+#ifndef SDL_POWER_DISABLED
+#if SDL_POWER_BLACKBERRY
 
-#include "SDL_platform.h"
+#include "SDL_power.h"
 
-/**
- *  \file SDL_config.h
- */
+#include "../../core/blackberry/SDL_blackberry.h"
 
-/* Add any platform that doesn't build using the configure system. */
-#if defined(__WIN32__)
-#include "SDL_config_windows.h"
-#elif defined(__MACOSX__)
-#include "SDL_config_macosx.h"
-#elif defined(__IPHONEOS__)
-#include "SDL_config_iphoneos.h"
-#elif defined(__ANDROID__)
-#include "SDL_config_android.h"
-#elif defined(__BLACKBERRY__)
-#include "SDL_config_blackberry.h"
-#elif defined(__PSP__)
-#include "SDL_config_psp.h"
-#else
-/* This is a minimal configuration just to get SDL running on new platforms */
-#include "SDL_config_minimal.h"
-#endif /* platform config */
+SDL_bool
+SDL_GetPowerInfo_BlackBerry(SDL_PowerState *state, int *seconds, int *percent)
+{    
+    if (BlackBerry_SYS_GetPowerInfo(state, seconds, percent) == -1) {
+        *state = SDL_POWERSTATE_UNKNOWN;
+        *seconds = -1;
+        *percent = -1;
+    }
 
-#ifdef USING_GENERATED_CONFIG_H
-#error Wrong SDL_config.h, check your include path?
-#endif
+    return SDL_TRUE;
+}
 
-#endif /* _SDL_config_h */
+#endif /* SDL_POWER_BLACKBERRY */
+#endif /* SDL_POWER_DISABLED */
+
+/* vi: set ts=4 sw=4 expandtab: */

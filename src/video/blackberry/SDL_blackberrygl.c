@@ -18,36 +18,30 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
+#include "SDL_config.h"
 
-#ifndef _SDL_config_h
-#define _SDL_config_h
+#if SDL_VIDEO_DRIVER_BLACKBERRY
 
-#include "SDL_platform.h"
+/* BlackBerry SDL video driver implementation */
 
-/**
- *  \file SDL_config.h
- */
+#include "SDL_video.h"
+#include "../SDL_egl.h"
+#include "SDL_blackberrywindow.h"
 
-/* Add any platform that doesn't build using the configure system. */
-#if defined(__WIN32__)
-#include "SDL_config_windows.h"
-#elif defined(__MACOSX__)
-#include "SDL_config_macosx.h"
-#elif defined(__IPHONEOS__)
-#include "SDL_config_iphoneos.h"
-#elif defined(__ANDROID__)
-#include "SDL_config_android.h"
-#elif defined(__BLACKBERRY__)
-#include "SDL_config_blackberry.h"
-#elif defined(__PSP__)
-#include "SDL_config_psp.h"
-#else
-/* This is a minimal configuration just to get SDL running on new platforms */
-#include "SDL_config_minimal.h"
-#endif /* platform config */
+#include "SDL_blackberryvideo.h"
+#include "../../core/blackberry/SDL_blackberry.h"
 
-#ifdef USING_GENERATED_CONFIG_H
-#error Wrong SDL_config.h, check your include path?
-#endif
+#include <dlfcn.h>
 
-#endif /* _SDL_config_h */
+SDL_EGL_CreateContext_impl(BlackBerry)
+SDL_EGL_SwapWindow_impl(BlackBerry)
+SDL_EGL_MakeCurrent_impl(BlackBerry)
+
+int
+BlackBerry_GLES_LoadLibrary(_THIS, const char *path) {
+    return SDL_EGL_LoadLibrary(_this, path, EGL_DEFAULT_DISPLAY);
+}
+
+#endif /* SDL_VIDEO_DRIVER_BLACKBERRY */
+
+/* vi: set ts=4 sw=4 expandtab: */

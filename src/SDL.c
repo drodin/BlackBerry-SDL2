@@ -394,6 +394,8 @@ SDL_GetPlatform()
     return "AIX";
 #elif __ANDROID__
     return "Android";
+#elif __BLACKBERRY__
+    return "BlackBerry";
 #elif __BEOS__
     return "BeOS";
 #elif __BSDI__

@@ -93,6 +93,10 @@ typedef struct _UIWindow UIWindow;
 #endif
 #endif
 
+#if defined(SDL_VIDEO_DRIVER_BLACKBERRY)
+#include <screen/screen.h>
+#endif
+
 /**
  *  These are the various supported windowing subsystems
  */
@@ -104,6 +108,7 @@ typedef enum
     SDL_SYSWM_DIRECTFB,
     SDL_SYSWM_COCOA,
     SDL_SYSWM_UIKIT,
+    SDL_SYSWM_BLACKBERRY,
 } SDL_SYSWM_TYPE;
 
 /**
@@ -194,6 +199,13 @@ struct SDL_SysWMinfo
         {
             UIWindow *window;           /* The UIKit window */
         } uikit;
+#endif
+#if defined(SDL_VIDEO_DRIVER_BLACKBERRY)
+        struct
+        {
+            screen_window_t window;     /* The BlackBerry window */
+            char *window_group;         /* The BlackBerry window group */
+        } blackberry;
 #endif
         /* Can't have an empty union */
         int dummy;

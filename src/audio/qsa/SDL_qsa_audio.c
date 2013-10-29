@@ -45,8 +45,13 @@
 #define DEFAULT_CPARAMS_VOICES 1
 
 #define DEFAULT_CPARAMS_FRAG_SIZE 4096
+#ifdef __BLACKBERRY__
+#define DEFAULT_CPARAMS_FRAGS_MIN 2
+#define DEFAULT_CPARAMS_FRAGS_MAX 4
+#else
 #define DEFAULT_CPARAMS_FRAGS_MIN 1
 #define DEFAULT_CPARAMS_FRAGS_MAX 1
+#endif
 
 #define QSA_NO_WORKAROUNDS  0x00000000
 #define QSA_MMAP_WORKAROUND 0x00000001
@@ -660,7 +665,11 @@ QSA_DetectDevices(int iscapture, SDL_AddAudioDevice addfn)
     if (!iscapture) {
         /* Playback devices enumeration requested */
         for (it = 0; it < cards; it++) {
+#ifdef __BLACKBERRY__
+            devices = 1;
+#else
             devices = 0;
+#endif
             do {
                 status =
                     snd_card_get_longname(it,

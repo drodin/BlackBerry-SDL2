@@ -65,7 +65,7 @@ SDL_EGL_GetProcAddress(_THIS, const char *proc)
     void *retval;
     
     /* eglGetProcAddress is busted on Android http://code.google.com/p/android/issues/detail?id=7681 */
-#if !defined(SDL_VIDEO_DRIVER_ANDROID)
+#if !defined(SDL_VIDEO_DRIVER_ANDROID) && !defined(SDL_VIDEO_DRIVER_BLACKBERRY)
     handle = _this->egl_data->egl_dll_handle;
     if (_this->egl_data->eglGetProcAddress) {
         retval = _this->egl_data->eglGetProcAddress(proc);
@@ -127,6 +127,7 @@ SDL_EGL_LoadLibrary(_THIS, const char *egl_path, NativeDisplayType native_displa
         return SDL_OutOfMemory();
     }
 
+#ifndef SDL_VIDEO_DRIVER_BLACKBERRY
 #ifdef RTLD_GLOBAL
     dlopen_flags = RTLD_LAZY | RTLD_GLOBAL;
 #else
@@ -171,6 +172,11 @@ SDL_EGL_LoadLibrary(_THIS, const char *egl_path, NativeDisplayType native_displa
     if (dll_handle == NULL) {
         return SDL_SetError("Could not load EGL library: %s", dlerror());
     }
+#else
+    dll_handle = dlopen(NULL, RTLD_NOW|RTLD_GLOBAL);
+    egl_dll_handle = NULL;
+    path = NULL;
+#endif
 
     /* Load new function pointers */
     LOAD_FUNC(eglGetDisplay);

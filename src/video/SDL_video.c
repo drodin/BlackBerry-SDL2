@@ -77,6 +77,9 @@ static VideoBootStrap *bootstrap[] = {
 #if SDL_VIDEO_DRIVER_ANDROID
     &Android_bootstrap,
 #endif
+#if SDL_VIDEO_DRIVER_BLACKBERRY
+    &BlackBerry_bootstrap,
+#endif
 #if SDL_VIDEO_DRIVER_PSP
     &PSP_bootstrap,
 #endif
@@ -1208,7 +1211,7 @@ SDL_CreateWindow(const char *title, int x, int y, int w, int h, Uint32 flags)
     }
 
     /* Some platforms have OpenGL enabled by default */
-#if (SDL_VIDEO_OPENGL && __MACOSX__) || __IPHONEOS__ || __ANDROID__
+#if (SDL_VIDEO_OPENGL && __MACOSX__) || __IPHONEOS__ || __ANDROID__ || __BLACKBERRY__
     flags |= SDL_WINDOW_OPENGL;
 #endif
     if (flags & SDL_WINDOW_OPENGL) {
