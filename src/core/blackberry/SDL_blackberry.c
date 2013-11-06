@@ -33,7 +33,9 @@
 #include <bps/paymentservice.h>
 #include <bps/sensor.h>
 #include <bps/virtualkeyboard.h>
+#ifndef __PLAYBOOK__
 #include <bps/battery.h>
+#endif
 
 #include "SDL_audio.h"
 #include "../../events/SDL_events_c.h"
@@ -59,6 +61,7 @@ static int lastButtonState = 0;
 static float fLastAccelerometer[3];
 static bool bHasNewData;
 
+#ifndef __PLAYBOOK__
 typedef struct GameController_t
 {
     // Static device info.
@@ -76,6 +79,7 @@ typedef struct GameController_t
 } GameController;
 static GameController _controllers[1];
 static int numControllers = 0;
+#endif
 
 static int orientation = -1;
 
@@ -159,6 +163,7 @@ int SDL_BlackBerry_Init()
 
     orientation = atoi(getenv("ORIENTATION"));
 
+#ifndef __PLAYBOOK__
     screenResolution[0] = atoi(getenv("WIDTH"));
     screenResolution[1] = atoi(getenv("HEIGHT"));
 
@@ -170,6 +175,35 @@ int SDL_BlackBerry_Init()
         screen_destroy_context(screenContext);
         return -1;
     }
+#else
+    static screen_display_t screenDisplay;
+    screen_get_window_property_pv(screenWindow, SCREEN_PROPERTY_DISPLAY, (void **)&screenDisplay);
+
+    screen_display_mode_t screenMode;
+    screen_get_display_property_pv(screenDisplay, SCREEN_PROPERTY_MODE, (void**)&screenMode);
+
+    int size[2];
+    screen_get_window_property_iv(screenWindow, SCREEN_PROPERTY_BUFFER_SIZE, size);
+
+    screenResolution[0] = size[0];
+    screenResolution[1] = size[1];
+
+    if ((orientation == 0) || (orientation == 180)) {
+        if (((screenMode.width > screenMode.height) && (size[0] < size[1])) ||
+            ((screenMode.width < screenMode.height) && (size[0] > size[1]))) {
+                screenResolution[1] = size[0];
+                screenResolution[0] = size[1];
+        }
+    } else { // orientation == 90 || orientation == 270
+        if (((screenMode.width > screenMode.height) && (size[0] > size[1])) ||
+            ((screenMode.width < screenMode.height && size[0] < size[1]))) {
+                screenResolution[1] = size[0];
+                screenResolution[0] = size[1];
+        }
+    }
+
+    screen_set_window_property_iv(screenWindow, SCREEN_PROPERTY_ROTATION, &orientation);
+#endif
 
     rc = screen_set_window_property_iv(screenWindow, SCREEN_PROPERTY_BUFFER_SIZE, screenResolution);
     if (rc) {
@@ -250,6 +284,7 @@ int BlackBerry_SYS_InitAccelerometer()
 
 int BlackBerry_SYS_InitController()
 {
+#ifndef __PLAYBOOK__
     int deviceCount;
     screen_get_context_property_iv(screenContext, SCREEN_PROPERTY_DEVICE_COUNT, &deviceCount);
     screen_device_t* devices = (screen_device_t*) calloc(deviceCount, sizeof(screen_device_t));
@@ -296,6 +331,7 @@ int BlackBerry_SYS_InitController()
             return 1; //FIXME: Supporting only one Gamepad for now
         }
     }
+#endif
 
     return 0;
 }
@@ -323,6 +359,7 @@ void handleNavigatorEvent(bps_event_t *bps_event)
         keysym.sym = SDLK_MENU;
         BlackBerry_OnKeyDown(keysym);
         break;
+#ifndef __PLAYBOOK__
     case (NAVIGATOR_KEYBOARD_STATE):
         switch (navigator_event_get_keyboard_state(bps_event)) {
         case NAVIGATOR_KEYBOARD_OPENED:
@@ -333,6 +370,7 @@ void handleNavigatorEvent(bps_event_t *bps_event)
             break;
         }
         break;
+#endif
     case (NAVIGATOR_WINDOW_STATE):
         switch (navigator_event_get_window_state(bps_event)) {
         case NAVIGATOR_WINDOW_FULLSCREEN:
@@ -469,6 +507,7 @@ static void handleMtouchEvent(screen_event_t event, screen_window_t window, int 
     BlackBerry_OnTouch(0/*touch_device_id*/, finger, action, position[0], position[1], pressure);
 }
 
+#ifndef __PLAYBOOK__
 void handleControllerEvent(screen_event_t screen_event)
 {
     screen_device_t device;
@@ -489,6 +528,7 @@ void handleControllerEvent(screen_event_t screen_event)
         controller->haveData = true;
     }
 }
+#endif
 
 void handleScreenEvent(bps_event_t *bps_event)
 {
@@ -515,10 +555,12 @@ void handleScreenEvent(bps_event_t *bps_event)
         case SCREEN_EVENT_MTOUCH_RELEASE:
         handleMtouchEvent(screen_event, window, type);
         break;
+#ifndef __PLAYBOOK__
     case SCREEN_EVENT_GAMEPAD:
         case SCREEN_EVENT_JOYSTICK:
         handleControllerEvent(screen_event);
         break;
+#endif
     default:
         break;
     }
@@ -658,12 +700,14 @@ SDL_bool BlackBerry_SYS_GetControllerInfo(int device_id, int* buttons, int* axes
 {
     SDL_bool retval = SDL_FALSE;
 
+#ifndef __PLAYBOOK__
     if (device_id <= numControllers) {
         GameController* controller = &_controllers[device_id - 1];
         *buttons = controller->buttonCount;
         *axes = controller->analogCount * 3;
         retval = SDL_TRUE;
     }
+#endif
 
     return retval;
 }
@@ -672,6 +716,7 @@ SDL_bool BlackBerry_SYS_GetControllerValues(int device_id, int* buttons, float* 
 {
     SDL_bool retval = SDL_FALSE;
 
+#ifndef __PLAYBOOK__
     if (device_id <= numControllers) {
         GameController* controller = &_controllers[device_id - 1];
         if (controller->haveData) {
@@ -691,6 +736,7 @@ SDL_bool BlackBerry_SYS_GetControllerValues(int device_id, int* buttons, float* 
             retval = SDL_TRUE;
         }
     }
+#endif
 
     return retval;
 }
@@ -728,6 +774,7 @@ SDL_bool BlackBerry_SYS_HasClipboardText()
 
 int BlackBerry_SYS_GetPowerInfo(SDL_PowerState* state, int* seconds, int* percent)
 {
+#ifndef __PLAYBOOK__
     int rc;
     battery_info_t* info;
 
@@ -752,6 +799,9 @@ int BlackBerry_SYS_GetPowerInfo(SDL_PowerState* state, int* seconds, int* percen
 
     battery_free_info(&info);
     return 0;
+#else
+    return -1;
+#endif
 }
 
 /* returns number of found touch devices as return value and ids in parameter ids */

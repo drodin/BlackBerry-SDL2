@@ -32,8 +32,14 @@
 
 #include <stdarg.h>
 
-#ifndef __BLACKBERRY_SIMULATOR__
+#if !defined(__BLACKBERRY_SIMULATOR__) && !defined(__PLAYBOOK__)
 #define HAVE_GCC_ATOMICS    1
+#endif
+
+//FIXME: PlayBook is ARMv7 but due to old qcc version the source is not compiling with v7 enabled
+#if !defined(__BLACKBERRY_SIMULATOR__) && defined(__PLAYBOOK__)
+#undef __ARM_ARCH_7A__
+#define __ARM_ARCH_6__
 #endif
 
 #define HAVE_ALLOCA_H       1
