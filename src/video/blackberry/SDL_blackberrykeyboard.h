@@ -32,5 +32,6 @@ extern SDL_bool BlackBerry_IsScreenKeyboardShown(_THIS, SDL_Window * window);
 extern void BlackBerry_StartTextInput(_THIS);
 extern void BlackBerry_StopTextInput(_THIS);
 extern void BlackBerry_SetTextInputRect(_THIS, SDL_Rect *rect);
+extern int BlackBerry_SendTextInput(SDL_Keysym keysym);
 
 /* vi: set ts=4 sw=4 expandtab: */

@@ -42,13 +42,6 @@ void BlackBerry_InitKeyboard(void)
 int
 BlackBerry_OnKeyDown(SDL_Keysym keysym)
 {
-    if (textInputActive) {
-        static char text[8];
-        char *end;
-        end = SDL_UCS4ToUTF8((Uint32) keysym.sym, text);
-        *end = '\0';
-        SDL_SendKeyboardText(text);
-    }
     SDL_SetModState(keysym.mod);
     return SDL_SendKeyboardKey(SDL_PRESSED, keysym.scancode);
 }
@@ -69,12 +62,14 @@ BlackBerry_HasScreenKeyboardSupport(_THIS)
 SDL_bool
 BlackBerry_IsScreenKeyboardShown(_THIS, SDL_Window * window)
 {
-    return SDL_IsTextInputActive();
+    return textInputActive;
 }
 
 void
 BlackBerry_StartTextInput(_THIS)
 {
+    if (textInputActive)
+        return;
     textInputActive = SDL_TRUE;
     SDL_VideoData *videodata = (SDL_VideoData *)_this->driverdata;
     BlackBerry_SYS_ShowTextInput(&videodata->textRect);
@@ -83,6 +78,8 @@ BlackBerry_StartTextInput(_THIS)
 void
 BlackBerry_StopTextInput(_THIS)
 {
+    if (!textInputActive)
+        return;
     textInputActive = SDL_FALSE;
     BlackBerry_SYS_HideTextInput();
 }
@@ -98,6 +95,16 @@ BlackBerry_SetTextInputRect(_THIS, SDL_Rect *rect)
     }
 
     videodata->textRect = *rect;
+}
+
+int
+BlackBerry_SendTextInput(SDL_Keysym keysym)
+{
+    static char text[8];
+    char *end;
+    end = SDL_UCS4ToUTF8((Uint32) keysym.sym, text);
+    *end = '\0';
+    return SDL_SendKeyboardText(text);
 }
 
 #endif /* SDL_VIDEO_DRIVER_BLACKBERRY */

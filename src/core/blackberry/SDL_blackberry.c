@@ -53,7 +53,7 @@ SDL_Keysym keysym;
 
 screen_context_t screenContext;
 screen_window_t screenWindow;
-static char windowGroup[sizeof(double)];
+static char windowGroup[64] = {0};
 
 static int lastButtonState = 0;
 
@@ -244,8 +244,12 @@ int SDL_BlackBerry_Init()
         return -1;
     }
 
+#ifndef __PLAYBOOK__
+    rc = screen_create_window_group(screenWindow, NULL);
+#else
     snprintf(windowGroup, sizeof(double), "%d", getpid());
     rc = screen_create_window_group(screenWindow, windowGroup);
+#endif
     if (rc) {
         SDL_SetError("Cannot create window group: %s", strerror(errno));
         screen_destroy_window(screenWindow);
@@ -253,6 +257,9 @@ int SDL_BlackBerry_Init()
         screen_destroy_context(screenContext);
         return -1;
     }
+#ifndef __PLAYBOOK__
+    screen_get_window_property_cv(screenWindow, SCREEN_PROPERTY_GROUP, sizeof(windowGroup), windowGroup);
+#endif
 
     rc = screen_request_events(screenContext);
     if (rc) {
@@ -431,24 +438,6 @@ static void handlePointerEvent(screen_event_t event, screen_window_t window)
     lastButtonState = buttonState;
 }
 
-int symToScancode[KEYCODE_TILDE - KEYCODE_SPACE + 1] = {
-    SDL_SCANCODE_SPACE, SDL_SCANCODE_KP_EXCLAM, 0/*SDL_SCANCODE_QUOTE*/, SDL_SCANCODE_KP_HASH, SDL_SCANCODE_CURRENCYUNIT, SDL_SCANCODE_KP_PERCENT,
-    SDL_SCANCODE_KP_AMPERSAND, SDL_SCANCODE_APOSTROPHE, SDL_SCANCODE_KP_LEFTPAREN, SDL_SCANCODE_KP_RIGHTPAREN, SDL_SCANCODE_KP_MULTIPLY,
-    SDL_SCANCODE_KP_PLUS, SDL_SCANCODE_COMMA, SDL_SCANCODE_MINUS, SDL_SCANCODE_PERIOD, SDL_SCANCODE_SLASH, SDL_SCANCODE_0, SDL_SCANCODE_1,
-    SDL_SCANCODE_2, SDL_SCANCODE_3, SDL_SCANCODE_4, SDL_SCANCODE_5, SDL_SCANCODE_6, SDL_SCANCODE_7, SDL_SCANCODE_8, SDL_SCANCODE_9, SDL_SCANCODE_KP_COLON,
-    SDL_SCANCODE_SEMICOLON, SDL_SCANCODE_KP_LESS, SDL_SCANCODE_EQUALS, SDL_SCANCODE_KP_GREATER, 0/*SDL_SCANCODE_QUESTION*/, SDL_SCANCODE_KP_AT,
-    /*CAPITAL LETTERS START*/
-    SDL_SCANCODE_A, SDL_SCANCODE_B, SDL_SCANCODE_C, SDL_SCANCODE_D, SDL_SCANCODE_E, SDL_SCANCODE_F, SDL_SCANCODE_G, SDL_SCANCODE_H, SDL_SCANCODE_I,
-    SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_M, SDL_SCANCODE_N, SDL_SCANCODE_O, SDL_SCANCODE_P, SDL_SCANCODE_Q, SDL_SCANCODE_R,
-    SDL_SCANCODE_S, SDL_SCANCODE_T, SDL_SCANCODE_U, SDL_SCANCODE_V, SDL_SCANCODE_W, SDL_SCANCODE_X, SDL_SCANCODE_Y, SDL_SCANCODE_Z,
-    /*CAPITAL LETTERS END*/
-    SDL_SCANCODE_LEFTBRACKET, SDL_SCANCODE_BACKSLASH, SDL_SCANCODE_RIGHTBRACKET, 0/*SDL_SCANCODE_CIRCUMFLEX*/, 0/*SDL_SCANCODE_UNDERSCORE*/,
-    SDL_SCANCODE_GRAVE, SDL_SCANCODE_A, SDL_SCANCODE_B, SDL_SCANCODE_C, SDL_SCANCODE_D, SDL_SCANCODE_E, SDL_SCANCODE_F, SDL_SCANCODE_G,
-    SDL_SCANCODE_H, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_M, SDL_SCANCODE_N, SDL_SCANCODE_O, SDL_SCANCODE_P,
-    SDL_SCANCODE_Q, SDL_SCANCODE_R, SDL_SCANCODE_S, SDL_SCANCODE_T, SDL_SCANCODE_U, SDL_SCANCODE_V, SDL_SCANCODE_W, SDL_SCANCODE_X, SDL_SCANCODE_Y,
-    SDL_SCANCODE_Z, SDL_SCANCODE_KP_LEFTBRACE, SDL_SCANCODE_KP_VERTICALBAR, SDL_SCANCODE_KP_RIGHTBRACE, 0/*SDL_SCANCODE_TILDE*/
-};
-
 static void handleKeyboardEvent(screen_event_t event)
 {
     int flags = 0;
@@ -456,8 +445,9 @@ static void handleKeyboardEvent(screen_event_t event)
     screen_get_event_property_iv(event, SCREEN_PROPERTY_KEY_SYM, &(keysym.sym));
 
     keysym.mod = KMOD_NONE;
+    keysym.scancode = SDL_SCANCODE_UNKNOWN;
 
-    if (flags & KEY_SCAN_VALID) {
+    if (flags & KEY_SCAN_VALID) { // Physical Keyboard
         int modifiers = 0;
         screen_get_event_property_iv(event, SCREEN_PROPERTY_KEY_MODIFIERS, &modifiers);
         if (modifiers & KEYMOD_SHIFT)
@@ -474,23 +464,12 @@ static void handleKeyboardEvent(screen_event_t event)
         int scan = 0;
         screen_get_event_property_iv(event, SCREEN_PROPERTY_KEY_SCAN, &scan);
         keysym.scancode = scan;
-    } else {
-        keysym.scancode = SDL_SCANCODE_UNKNOWN;
-        if (keysym.sym >= KEYCODE_CAPITAL_A && keysym.sym <= KEYCODE_CAPITAL_Z)
-            keysym.mod |= KMOD_LSHIFT;
 
-        if (keysym.sym >= KEYCODE_SPACE && keysym.sym <= KEYCODE_TILDE) {
-            keysym.scancode = symToScancode[keysym.sym - KEYCODE_SPACE];
-        } else if (keysym.sym == KEYCODE_BACKSPACE) {
-            keysym.sym = SDLK_BACKSPACE;
-            keysym.scancode = SDL_SCANCODE_BACKSPACE;
-        } else if (keysym.sym == KEYCODE_RETURN) {
-            keysym.sym = SDLK_RETURN;
-            keysym.scancode = SDL_SCANCODE_RETURN;
-        }   
+        int posted = (flags & 0x1) ? BlackBerry_OnKeyDown(keysym) : BlackBerry_OnKeyUp(keysym);
+    } else { // Virtual Keyboard
+        if (flags & 0x1)
+            BlackBerry_SendTextInput(keysym);
     }
-
-    int posted = (flags & 0x1) ? BlackBerry_OnKeyDown(keysym) : BlackBerry_OnKeyUp(keysym);
 }
 
 static void handleMtouchEvent(screen_event_t event, screen_window_t window, int action)
@@ -540,10 +519,6 @@ void handleScreenEvent(bps_event_t *bps_event)
     screen_get_event_property_pv(screen_event, SCREEN_PROPERTY_WINDOW, (void **) &window);
 
     switch (type) {
-    case SCREEN_EVENT_CLOSE:
-        SDL_SendQuit();
-        SDL_SendAppEvent(SDL_APP_TERMINATING);
-        break;
     case SCREEN_EVENT_POINTER:
         handlePointerEvent(screen_event, window);
         break;
@@ -609,12 +584,16 @@ void handlePaymentEvent(bps_event_t *bps_event)
 
             int i = 0;
             for (i = 0; i < purchases; i++) {
-                SDL_Event event;
-                event.type = SDL_USEREVENT;
-                event.user.code = 1;
-                event.user.data1 = (void *) paymentservice_event_get_digital_good_id(bps_event, i);
-                event.user.data2 = (void *) paymentservice_event_get_digital_good_sku(bps_event, i);
-                SDL_PushEvent(&event);
+                const char* good_id = paymentservice_event_get_digital_good_id(bps_event, i);
+                const char* good_sku = paymentservice_event_get_digital_good_sku(bps_event, i);
+                if (good_id != NULL && good_sku != NULL) {
+                    SDL_Event event;
+                    event.type = SDL_USEREVENT;
+                    event.user.code = 1;
+                    event.user.data1 = (void *) good_id;
+                    event.user.data2 = (void *) good_sku;
+                    SDL_PushEvent(&event);
+                }
             }
         }
     } else {
@@ -667,8 +646,6 @@ char* BlackBerry_SYS_GetNativeWindowGroup(void)
 
 void BlackBerry_SYS_ReleaseNativeWindow(screen_window_t native_window)
 {
-    LOGE("BlackBerry_SYS_ReleaseNativeWindow\n");
-
     screen_destroy_window_buffers(screenWindow);
     screen_destroy_window(screenWindow);
     screen_stop_events(screenContext);
@@ -816,6 +793,7 @@ int BlackBerry_SYS_GetTouchDeviceIds(int **ids)
 
 void BlackBerry_SYS_ShowTextInput(SDL_Rect *inputRect)
 {
+    virtualkeyboard_change_options(VIRTUALKEYBOARD_LAYOUT_DEFAULT, VIRTUALKEYBOARD_ENTER_DEFAULT);
     virtualkeyboard_show();
 }
 
