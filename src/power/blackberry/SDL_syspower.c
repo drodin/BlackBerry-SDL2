@@ -29,7 +29,7 @@
 
 SDL_bool
 SDL_GetPowerInfo_BlackBerry(SDL_PowerState *state, int *seconds, int *percent)
-{    
+{
     if (BlackBerry_SYS_GetPowerInfo(state, seconds, percent) == -1) {
         *state = SDL_POWERSTATE_UNKNOWN;
         *seconds = -1;

@@ -30,7 +30,7 @@
 
 #include <bps/screen.h>
 #include <bps/navigator.h>
-#include <bps/paymentservice.h>
+//#include <bps/paymentservice.h>
 #include <bps/sensor.h>
 #include <bps/virtualkeyboard.h>
 #ifndef __PLAYBOOK__
@@ -49,10 +49,10 @@
 *******************************************************************************/
 static int screenResolution[2];
 
-SDL_Keysym keysym;
+static SDL_Keysym keysym;
 
-screen_context_t screenContext;
-screen_window_t screenWindow;
+static screen_context_t screenContext;
+static screen_window_t screenWindow;
 static char windowGroup[64] = {0};
 
 static int lastButtonState = 0;
@@ -77,14 +77,14 @@ typedef struct GameController_t
     int analog0[3];
     int analog1[3];
 } GameController;
-static GameController _controllers[1];
-static int numControllers = 0;
+static GameController _controller;
 #endif
+static int numControllers = 0;
 
 static int orientation = -1;
 
 const char clipType[] = "text/plain";
-char *clipText;
+static char *clipText;
 
 /*******************************************************************************
                  Init
@@ -109,6 +109,14 @@ int SDL_BlackBerry_Init()
         return -1;
     }
 
+    rc = virtualkeyboard_request_events(0);
+    if (rc) {
+        SDL_SetError("Cannot request virtual keyboard events: %s", strerror(errno));
+        bps_shutdown();
+        screen_destroy_context(screenContext);
+        return -1;
+    }
+
     rc = navigator_request_events(0);
     if (rc) {
         SDL_SetError("Cannot request navigator events: %s", strerror(errno));
@@ -125,6 +133,7 @@ int SDL_BlackBerry_Init()
         return -1;
     }
 
+    /*
     rc = paymentservice_request_events(0);
     if (rc) {
         LOGE("Cannot request payment service events: %s", strerror(errno));
@@ -132,6 +141,7 @@ int SDL_BlackBerry_Init()
 #ifdef __BLACKBERRY_DEBUG__
     paymentservice_set_connection_mode(true);
 #endif
+     */
 
     rc = screen_create_window(&screenWindow, screenContext);
     if (rc) {
@@ -302,14 +312,13 @@ int BlackBerry_SYS_InitController()
         int type;
         int rc = screen_get_device_property_iv(devices[ic], SCREEN_PROPERTY_TYPE, &type);
 
-        if (!rc && (type == SCREEN_EVENT_GAMEPAD || type == SCREEN_EVENT_JOYSTICK)) {
-            GameController* controller = &_controllers[ic];
+        //FIXME: Supporting only one Gamepad for now
+        if (!rc && type == SCREEN_EVENT_GAMEPAD && numControllers == 0) {
+            GameController* controller = &_controller;
             controller->handle = devices[ic];
+            controller->type = type;
 
             //loadController
-            screen_get_device_property_iv(controller->handle,
-                SCREEN_PROPERTY_TYPE, &controller->type);
-
             screen_get_device_property_cv(controller->handle,
                 SCREEN_PROPERTY_ID_STRING, sizeof(controller->id),
                 controller->id);
@@ -324,7 +333,7 @@ int BlackBerry_SYS_InitController()
             }
 
             if (!screen_get_device_property_iv(controller->handle,
-                SCREEN_PROPERTY_ANALOG1, controller->analog0)) {
+                SCREEN_PROPERTY_ANALOG1, controller->analog1)) {
                 ++controller->analogCount;
             }
 
@@ -335,17 +344,31 @@ int BlackBerry_SYS_InitController()
             //loadController end
 
             numControllers++;
-            return 1; //FIXME: Supporting only one Gamepad for now
         }
     }
 #endif
 
-    return 0;
+    return numControllers;
 }
 
 /*******************************************************************************
                  Handle Events
 *******************************************************************************/
+
+void handleVirtualKeyboardEvent(bps_event_t *bps_event) {
+    switch (bps_event_get_code(bps_event)) {
+    case VIRTUALKEYBOARD_EVENT_VISIBLE:
+        //if (SDL_GetEventState(SDL_TEXTINPUT) != SDL_ENABLE)
+        //    SDL_StartTextInput();
+        break;
+    case VIRTUALKEYBOARD_EVENT_HIDDEN:
+        //if (SDL_GetEventState(SDL_TEXTINPUT) == SDL_ENABLE)
+        //    SDL_StopTextInput();
+        break;
+    default:
+        break;
+    }
+}
 
 void handleNavigatorEvent(bps_event_t *bps_event)
 {
@@ -366,18 +389,6 @@ void handleNavigatorEvent(bps_event_t *bps_event)
         keysym.sym = SDLK_MENU;
         BlackBerry_OnKeyDown(keysym);
         break;
-#ifndef __PLAYBOOK__
-    case (NAVIGATOR_KEYBOARD_STATE):
-        switch (navigator_event_get_keyboard_state(bps_event)) {
-        case NAVIGATOR_KEYBOARD_OPENED:
-            SDL_StartTextInput();
-            break;
-        case NAVIGATOR_KEYBOARD_CLOSED:
-            SDL_StopTextInput();
-            break;
-        }
-        break;
-#endif
     case (NAVIGATOR_WINDOW_STATE):
         switch (navigator_event_get_window_state(bps_event)) {
         case NAVIGATOR_WINDOW_FULLSCREEN:
@@ -410,6 +421,7 @@ void handleNavigatorEvent(bps_event_t *bps_event)
 
 static void handlePointerEvent(screen_event_t event, screen_window_t window)
 {
+#ifndef __BLACKBERRY_SIMULATOR__
     int buttonState = 0;
     screen_get_event_property_iv(event, SCREEN_PROPERTY_BUTTONS, &buttonState);
 
@@ -436,20 +448,26 @@ static void handlePointerEvent(screen_event_t event, screen_window_t window)
     }
 
     lastButtonState = buttonState;
+#endif
 }
 
 static void handleKeyboardEvent(screen_event_t event)
 {
-    int flags = 0;
+    int flags, modifiers;
+    screen_get_event_property_iv(event, SCREEN_PROPERTY_KEY_CAP, &(keysym.sym));
     screen_get_event_property_iv(event, SCREEN_PROPERTY_KEY_FLAGS, &flags);
-    screen_get_event_property_iv(event, SCREEN_PROPERTY_KEY_SYM, &(keysym.sym));
+    screen_get_event_property_iv(event, SCREEN_PROPERTY_KEY_MODIFIERS, &modifiers);
 
     keysym.mod = KMOD_NONE;
     keysym.scancode = SDL_SCANCODE_UNKNOWN;
+    keysym.unused = flags & KEY_DOWN;
+
+    if (SDL_GetEventState(SDL_TEXTINPUT) == SDL_ENABLE) { // Send to text input
+        BlackBerry_SendTextInput(keysym);
+        return;
+    }
 
     if (flags & KEY_SCAN_VALID) { // Physical Keyboard
-        int modifiers = 0;
-        screen_get_event_property_iv(event, SCREEN_PROPERTY_KEY_MODIFIERS, &modifiers);
         if (modifiers & KEYMOD_SHIFT)
             keysym.mod |= KMOD_LSHIFT;
         if (modifiers & KEYMOD_CTRL)
@@ -460,16 +478,16 @@ static void handleKeyboardEvent(screen_event_t event)
             keysym.mod |= KMOD_CAPS;
         if (modifiers & KEYMOD_NUM_LOCK)
             keysym.mod |= KMOD_NUM;
-
-        int scan = 0;
-        screen_get_event_property_iv(event, SCREEN_PROPERTY_KEY_SCAN, &scan);
-        keysym.scancode = scan;
-
-        int posted = (flags & 0x1) ? BlackBerry_OnKeyDown(keysym) : BlackBerry_OnKeyUp(keysym);
     } else { // Virtual Keyboard
-        if (flags & 0x1)
-            BlackBerry_SendTextInput(keysym);
+        if (modifiers & KEYMOD_CAPS_LOCK)
+            keysym.mod |= KMOD_CAPS;
+        if (keysym.sym >= KEYCODE_CAPITAL_A && keysym.sym <= KEYCODE_CAPITAL_Z) {
+            keysym.mod |= KMOD_LSHIFT;
+            keysym.sym += 32;
+        }
     }
+
+    (flags & KEY_DOWN) ? BlackBerry_OnKeyDown(keysym) : BlackBerry_OnKeyUp(keysym);
 }
 
 static void handleMtouchEvent(screen_event_t event, screen_window_t window, int action)
@@ -492,7 +510,7 @@ void handleControllerEvent(screen_event_t screen_event)
     screen_device_t device;
     screen_get_event_property_pv(screen_event, SCREEN_PROPERTY_DEVICE, (void**) &device);
 
-    GameController* controller = &_controllers[0]; //FIXME: Supporting only one Gamepad for now
+    GameController* controller = &_controller;
     if (controller->handle != NULL && device == controller->handle) {
         screen_get_event_property_iv(screen_event, SCREEN_PROPERTY_BUTTONS, &controller->buttons);
 
@@ -526,13 +544,12 @@ void handleScreenEvent(bps_event_t *bps_event)
         handleKeyboardEvent(screen_event);
         break;
     case SCREEN_EVENT_MTOUCH_TOUCH:
-        case SCREEN_EVENT_MTOUCH_MOVE:
-        case SCREEN_EVENT_MTOUCH_RELEASE:
+    case SCREEN_EVENT_MTOUCH_MOVE:
+    case SCREEN_EVENT_MTOUCH_RELEASE:
         handleMtouchEvent(screen_event, window, type);
         break;
 #ifndef __PLAYBOOK__
     case SCREEN_EVENT_GAMEPAD:
-        case SCREEN_EVENT_JOYSTICK:
         handleControllerEvent(screen_event);
         break;
 #endif
@@ -573,6 +590,7 @@ void handleSensorEvent(bps_event_t* bps_event)
     }
 }
 
+/*
 void handlePaymentEvent(bps_event_t *bps_event)
 {
     if (paymentservice_event_get_response_code(bps_event) == SUCCESS_RESPONSE) {
@@ -605,6 +623,7 @@ void handlePaymentEvent(bps_event_t *bps_event)
             request_id, error_id, error_text ? error_text : "N/A");
     }
 }
+*/
 
 void BlackBerry_SYS_ProcessEvents()
 {
@@ -614,14 +633,16 @@ void BlackBerry_SYS_ProcessEvents()
     while (global_bps_event) {
         int domain = bps_event_get_domain(global_bps_event);
 
-        if (domain == navigator_get_domain()) {
+        if (domain == virtualkeyboard_get_domain()) {
+            handleVirtualKeyboardEvent(global_bps_event);
+        } else if (domain == navigator_get_domain()) {
             handleNavigatorEvent(global_bps_event);
         } else if (domain == screen_get_domain()) {
             handleScreenEvent(global_bps_event);
         } else if (domain == sensor_get_domain()) {
             handleSensorEvent(global_bps_event);
-        } else if (domain == paymentservice_get_domain()) {
-            handlePaymentEvent(global_bps_event);
+        //} else if (domain == paymentservice_get_domain()) {
+        //    handlePaymentEvent(global_bps_event);
         } else {
             LOGE("BlackBerry - unhandled event domain: %d\n", domain);
         }
@@ -679,7 +700,7 @@ SDL_bool BlackBerry_SYS_GetControllerInfo(int device_id, int* buttons, int* axes
 
 #ifndef __PLAYBOOK__
     if (device_id <= numControllers) {
-        GameController* controller = &_controllers[device_id - 1];
+        GameController* controller = &_controller;
         *buttons = controller->buttonCount;
         *axes = controller->analogCount * 3;
         retval = SDL_TRUE;
@@ -695,7 +716,7 @@ SDL_bool BlackBerry_SYS_GetControllerValues(int device_id, int* buttons, float* 
 
 #ifndef __PLAYBOOK__
     if (device_id <= numControllers) {
-        GameController* controller = &_controllers[device_id - 1];
+        GameController* controller = &_controller;
         if (controller->haveData) {
             *buttons = controller->buttons;
             if (controller->analogCount > 0) {

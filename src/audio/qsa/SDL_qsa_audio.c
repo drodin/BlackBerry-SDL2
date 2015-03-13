@@ -665,11 +665,7 @@ QSA_DetectDevices(int iscapture, SDL_AddAudioDevice addfn)
     if (!iscapture) {
         /* Playback devices enumeration requested */
         for (it = 0; it < cards; it++) {
-#ifdef __BLACKBERRY__
-            devices = 1;
-#else
             devices = 0;
-#endif
             do {
                 status =
                     snd_card_get_longname(it,

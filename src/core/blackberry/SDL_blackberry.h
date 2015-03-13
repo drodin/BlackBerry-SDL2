@@ -43,8 +43,8 @@ extern "C" {
 
 extern int SDL_BlackBerry_Init();
 
-int BlackBerry_SYS_InitAccelerometer();
-int BlackBerry_SYS_InitController();
+extern int BlackBerry_SYS_InitAccelerometer();
+extern int BlackBerry_SYS_InitController();
 
 /* Interface from the SDL library into the BlackBerry System */
 extern void BlackBerry_SYS_SetActivityTitle(const char *title);

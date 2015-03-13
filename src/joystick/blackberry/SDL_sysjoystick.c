@@ -130,7 +130,7 @@ SDL_SYS_JoystickUpdate(SDL_Joystick * joystick)
         int i;
         Sint16 value;
         float axes[3];
-    
+
         if (BlackBerry_SYS_GetAccelerometerValues(axes)) {
             for ( i = 0; i < 3; i++ ) {
                 axes[i] = (axes[i] > 1) ? 1 : ((axes[i] < -1) ? -1 : axes[i]);
@@ -143,7 +143,7 @@ SDL_SYS_JoystickUpdate(SDL_Joystick * joystick)
         Sint16 value;
         int buttons;
         float axes[joystick->naxes];
-        
+
         if (BlackBerry_SYS_GetControllerValues(joystick->instance_id, &buttons, axes)) {
             int button, state, pstate;
             static int pbuttons = 0;
@@ -154,7 +154,7 @@ SDL_SYS_JoystickUpdate(SDL_Joystick * joystick)
                     SDL_PrivateJoystickButton(joystick, button, state);
             }
             pbuttons = buttons;
-            
+
             for ( i = 0; i < joystick->naxes; i++ ) {
                 axes[i] = (axes[i] > 1) ? 1 : ((axes[i] < -1) ? -1 : axes[i]);
                 value = (Sint16)(axes[i] * 32767.0f);
