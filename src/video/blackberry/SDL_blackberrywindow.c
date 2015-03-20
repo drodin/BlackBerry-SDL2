@@ -28,7 +28,11 @@
 #include "../../events/SDL_mouse_c.h"
 
 #include "SDL_blackberryvideo.h"
+#include "SDL_blackberrygl.h"
 #include "SDL_blackberrywindow.h"
+
+/* Currently only one window */
+SDL_Window *BlackBerry_Window = NULL;
 
 int
 BlackBerry_CreateWindow(_THIS, SDL_Window * window)
@@ -68,13 +72,6 @@ BlackBerry_CreateWindow(_THIS, SDL_Window * window)
         return SDL_SetError("Could not fetch native window");
     }
 
-    data->egl_surface = SDL_EGL_CreateSurface(_this, (NativeWindowType) data->native_window);
-
-    if (data->egl_surface == EGL_NO_SURFACE ) {
-        SDL_free(data);
-        return SDL_SetError("Could not create GLES window surface");
-    }
-
     window->driverdata = data;
     BlackBerry_Window = window;
 
@@ -98,7 +95,8 @@ BlackBerry_DestroyWindow(_THIS, SDL_Window * window)
         if (window->driverdata) {
             data = (SDL_WindowData *) window->driverdata;
             if (data->native_window) {
-                BlackBerry_SYS_ReleaseNativeWindow(data->native_window);
+                BlackBerry_GLES_DeleteContext(_this, NULL); //TODO: clean way
+                BlackBerry_SYS_ReleaseNativeWindow();
             }
             SDL_free(window->driverdata);
             window->driverdata = NULL;

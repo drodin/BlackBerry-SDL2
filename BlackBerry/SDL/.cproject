@@ -122,7 +122,6 @@
 								</option>
 								<option id="com.qnx.qcc.option.compiler.qccoptions.1450023805" name="QCC Options" superClass="com.qnx.qcc.option.compiler.qccoptions" valueType="stringList">
 									<listOptionValue builtIn="false" value="-frecord-gcc-switches"/>
-									<listOptionValue builtIn="false" value="-fno-strict-aliasing"/>
 								</option>
 								<inputType id="com.qnx.qcc.inputType.compiler.474826320" superClass="com.qnx.qcc.inputType.compiler"/>
 							</tool>

@@ -27,6 +27,7 @@
 #include "../../events/SDL_touch_c.h"
 #include "SDL_log.h"
 
+#include "SDL_blackberrywindow.h"
 #include "SDL_blackberrytouch.h"
 
 #include "../../core/blackberry/SDL_blackberry.h"

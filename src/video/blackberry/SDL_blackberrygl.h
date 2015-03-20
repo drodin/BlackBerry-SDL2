@@ -20,20 +20,21 @@
 */
 #include "SDL_config.h"
 
-#ifndef _SDL_blackberryvideo_h
-#define _SDL_blackberryvideo_h
+#ifndef _SDL_blackberrygl_h
+#define _SDL_blackberrygl_h
 
-#include "SDL_mutex.h"
-#include "SDL_rect.h"
 #include "../SDL_sysvideo.h"
 
-/* Private display data */
+extern int BlackBerry_GLES_LoadLibrary(_THIS, const char *path);
+extern void * BlackBerry_GLES_GetProcAddress(_THIS, const char *proc);
+extern void BlackBerry_GLES_UnloadLibrary(_THIS);
+extern SDL_GLContext BlackBerry_GLES_CreateContext(_THIS, SDL_Window * window);
+extern int BlackBerry_GLES_MakeCurrent(_THIS, SDL_Window * window, SDL_GLContext context);
+extern int BlackBerry_GLES_SetSwapInterval(_THIS, int interval);
+extern int BlackBerry_GLES_GetSwapInterval(_THIS);
+extern void BlackBerry_GLES_SwapWindow(_THIS, SDL_Window * window);
+extern void BlackBerry_GLES_DeleteContext(_THIS, SDL_GLContext context);
 
-typedef struct SDL_VideoData
-{
-    SDL_Rect        textRect;
-} SDL_VideoData;
-
-#endif /* _SDL_blackberryvideo_h */
+#endif /* _SDL_blackberrygl_h */
 
 /* vi: set ts=4 sw=4 expandtab: */

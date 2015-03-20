@@ -23,8 +23,9 @@
 #ifndef _SDL_blackberrywindow_h
 #define _SDL_blackberrywindow_h
 
+#include "../SDL_sysvideo.h"
+
 #include "../../core/blackberry/SDL_blackberry.h"
-#include "../SDL_egl.h"
 
 extern int BlackBerry_CreateWindow(_THIS, SDL_Window * window);
 extern void BlackBerry_SetWindowTitle(_THIS, SDL_Window * window);
@@ -34,10 +35,11 @@ extern SDL_bool BlackBerry_GetWindowWMInfo(_THIS, SDL_Window * window,
 
 typedef struct
 {
-    EGLSurface egl_surface;
     screen_window_t native_window;
     char* window_group;
 } SDL_WindowData;
+
+extern SDL_Window *BlackBerry_Window;
 
 #endif /* _SDL_blackberrywindow_h */
 

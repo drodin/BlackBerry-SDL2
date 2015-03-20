@@ -471,7 +471,11 @@ SDL_VideoInit(const char *driver_name)
     _this->gl_config.blue_size = 2;
     _this->gl_config.alpha_size = 0;
     _this->gl_config.buffer_size = 0;
+#ifndef __BLACKBERRY__
     _this->gl_config.depth_size = 16;
+#else
+    _this->gl_config.depth_size = 0;
+#endif
     _this->gl_config.stencil_size = 0;
     _this->gl_config.double_buffer = 1;
     _this->gl_config.accum_red_size = 0;

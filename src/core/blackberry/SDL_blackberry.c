@@ -47,13 +47,21 @@
 /*******************************************************************************
                                Globals
 *******************************************************************************/
-static int screenResolution[2];
-
 static SDL_Keysym keysym;
 
 static screen_context_t screenContext;
 static screen_window_t screenWindow;
-static char windowGroup[64] = {0};
+
+int BlackBerry_ScreenWidth = 0;
+int BlackBerry_ScreenHeight = 0;
+
+#ifdef SDL_VIDEO_OPENGL_ES
+    static int usage = SCREEN_USAGE_OPENGL_ES1 | SCREEN_USAGE_ROTATION;
+#elif defined(SDL_VIDEO_OPENGL_ES2)
+    static int usage = SCREEN_USAGE_OPENGL_ES2 | SCREEN_USAGE_ROTATION;
+#endif
+static int nbuffers = 2;
+static int format = SCREEN_FORMAT_RGBX8888;
 
 static int lastButtonState = 0;
 
@@ -98,38 +106,157 @@ int SDL_BlackBerry_Init()
 
     rc = screen_create_context(&screenContext, 0);
     if (rc) {
-        SDL_SetError("Cannot create screen context: %s", strerror(errno));
+        LOGE("Failed screen_create_context\n");
         return -1;
     }
 
     rc = bps_initialize();
     if (rc) {
-        SDL_SetError("Cannot initializes the BPS library: %s", strerror(errno));
+        LOGE("Failed bps_initialize\n");
         screen_destroy_context(screenContext);
+        return -1;
+    }
+
+    rc = screen_create_window(&screenWindow, screenContext);
+    if (rc) {
+        LOGE("Failed screen_create_window\n");
+        screen_destroy_context(screenContext);
+        bps_shutdown();
+        return -1;
+    }
+
+    rc = screen_create_window_group(screenWindow, BlackBerry_SYS_GetNativeWindowGroup());
+    if (rc) {
+        LOGE("Failed screen_create_window_group\n");
+        BlackBerry_SYS_ReleaseNativeWindow();
+        return -1;
+    }
+
+    rc = screen_set_window_property_iv(screenWindow, SCREEN_PROPERTY_FORMAT, &format);
+    if (rc) {
+        LOGE("Failed screen_set_window_property_iv(SCREEN_PROPERTY_FORMAT)\n");
+        BlackBerry_SYS_ReleaseNativeWindow();
+        return -1;
+    }
+
+    rc = screen_set_window_property_iv(screenWindow, SCREEN_PROPERTY_USAGE, &usage);
+    if (rc) {
+        LOGE("Failed screen_set_window_property_iv(SCREEN_PROPERTY_USAGE)\n");
+        BlackBerry_SYS_ReleaseNativeWindow();
+        return -1;
+    }
+
+    int position[2] = { 0, 0 };
+    rc = screen_set_window_property_iv(screenWindow, SCREEN_PROPERTY_POSITION, position);
+    if (rc) {
+        LOGE("Failed screen_set_window_property_iv(SCREEN_PROPERTY_POSITION)\n");
+        BlackBerry_SYS_ReleaseNativeWindow();
+        return -1;
+    }
+
+    int idle_mode = SCREEN_IDLE_MODE_KEEP_AWAKE;
+    rc = screen_set_window_property_iv(screenWindow, SCREEN_PROPERTY_IDLE_MODE, &idle_mode);
+    if (rc) {
+        LOGE("Failed screen_set_window_property_iv(SCREEN_PROPERTY_IDLE_MODE)\n");
+        BlackBerry_SYS_ReleaseNativeWindow();
+        return -1;
+    }
+
+    const char *env;
+
+    env = getenv("ORIENTATION");
+    if (0 == env) {
+        LOGE("Failed getenv for ORIENTATION\n");
+        BlackBerry_SYS_ReleaseNativeWindow();
+        return -1;
+    }
+    orientation = atoi(env);
+
+#ifndef __PLAYBOOK__
+    env = getenv("WIDTH");
+    if (0 == env) {
+        LOGE("Failed getenv for WIDTH\n");
+        BlackBerry_SYS_ReleaseNativeWindow();
+        return -1;
+    }
+    BlackBerry_ScreenWidth = atoi(env);
+
+    env = getenv("HEIGHT");
+    if (0 == env) {
+        LOGE("Failed getenv for HEIGHT\n");
+        BlackBerry_SYS_ReleaseNativeWindow();
+        return -1;
+    }
+    BlackBerry_ScreenHeight = atoi(env);
+#else
+    static screen_display_t screenDisplay;
+    screen_get_window_property_pv(screenWindow, SCREEN_PROPERTY_DISPLAY, (void **)&screenDisplay);
+
+    screen_display_mode_t screenMode;
+    screen_get_display_property_pv(screenDisplay, SCREEN_PROPERTY_MODE, (void**)&screenMode);
+
+    int size[2];
+    screen_get_window_property_iv(screenWindow, SCREEN_PROPERTY_BUFFER_SIZE, size);
+
+    BlackBerry_ScreenWidth = size[0];
+    BlackBerry_ScreenHeight = size[1];
+
+    if ((orientation == 0) || (orientation == 180)) {
+        if (((screenMode.width > screenMode.height) && (size[0] < size[1])) ||
+            ((screenMode.width < screenMode.height) && (size[0] > size[1]))) {
+                BlackBerry_ScreenHeight = size[0];
+                BlackBerry_ScreenWidth = size[1];
+        }
+    } else { // orientation == 90 || orientation == 270
+        if (((screenMode.width > screenMode.height) && (size[0] > size[1])) ||
+            ((screenMode.width < screenMode.height && size[0] < size[1]))) {
+                BlackBerry_ScreenHeight = size[0];
+                BlackBerry_ScreenWidth = size[1];
+        }
+    }
+
+    screen_set_window_property_iv(screenWindow, SCREEN_PROPERTY_ROTATION, &orientation);
+#endif
+
+    int bufferSize[2] = { BlackBerry_ScreenWidth, BlackBerry_ScreenHeight };
+    rc = screen_set_window_property_iv(screenWindow, SCREEN_PROPERTY_BUFFER_SIZE, bufferSize);
+    if (rc) {
+        LOGE("Failed screen_set_window_property_iv(SCREEN_PROPERTY_BUFFER_SIZE)\n");
+        BlackBerry_SYS_ReleaseNativeWindow();
+        return -1;
+    }
+
+    rc = screen_create_window_buffers(screenWindow, nbuffers);
+    if (rc) {
+        LOGE("Failed screen_create_window_buffers\n");
+        BlackBerry_SYS_ReleaseNativeWindow();
+        return -1;
+    }
+
+    if (BPS_SUCCESS != screen_request_events(screenContext)) {
+        LOGE("Failed screen_request_events\n");
+        BlackBerry_SYS_ReleaseNativeWindow();
         return -1;
     }
 
     rc = virtualkeyboard_request_events(0);
     if (rc) {
-        SDL_SetError("Cannot request virtual keyboard events: %s", strerror(errno));
-        bps_shutdown();
-        screen_destroy_context(screenContext);
+        LOGE("Failed screen_request_events\n");
+        BlackBerry_SYS_ReleaseNativeWindow();
         return -1;
     }
 
     rc = navigator_request_events(0);
     if (rc) {
-        SDL_SetError("Cannot request navigator events: %s", strerror(errno));
-        bps_shutdown();
-        screen_destroy_context(screenContext);
+        LOGE("Failed screen_request_events\n");
+        BlackBerry_SYS_ReleaseNativeWindow();
         return -1;
     }
 
     rc = navigator_rotation_lock(true);
     if (rc) {
-        SDL_SetError("Cannot set navigator rotation lock: %s", strerror(errno));
-        bps_shutdown();
-        screen_destroy_context(screenContext);
+        LOGE("Failed screen_request_events\n");
+        BlackBerry_SYS_ReleaseNativeWindow();
         return -1;
     }
 
@@ -143,146 +270,6 @@ int SDL_BlackBerry_Init()
 #endif
      */
 
-    rc = screen_create_window(&screenWindow, screenContext);
-    if (rc) {
-        SDL_SetError("Cannot create window: %s", strerror(errno));
-        bps_shutdown();
-        screen_destroy_context(screenContext);
-        return -1;
-    }
-
-    int position[2] = { 0, 0 };
-    rc = screen_set_window_property_iv(screenWindow, SCREEN_PROPERTY_POSITION, position);
-    if (rc) {
-        SDL_SetError("Cannot position window: %s", strerror(errno));
-        screen_destroy_window(screenWindow);
-        bps_shutdown();
-        screen_destroy_context(screenContext);
-        return -1;
-    }
-
-    int idle_mode = SCREEN_IDLE_MODE_KEEP_AWAKE;
-    rc = screen_set_window_property_iv(screenWindow, SCREEN_PROPERTY_IDLE_MODE, &idle_mode);
-    if (rc) {
-        SDL_SetError("Cannot disable idle mode: %s", strerror(errno));
-        screen_destroy_window(screenWindow);
-        bps_shutdown();
-        screen_destroy_context(screenContext);
-        return -1;
-    }
-
-    orientation = atoi(getenv("ORIENTATION"));
-
-#ifndef __PLAYBOOK__
-    screenResolution[0] = atoi(getenv("WIDTH"));
-    screenResolution[1] = atoi(getenv("HEIGHT"));
-
-    rc = screen_set_window_property_iv(screenWindow, SCREEN_PROPERTY_SIZE, screenResolution);
-    if (rc) {
-        SDL_SetError("Cannot resize window: %s", strerror(errno));
-        screen_destroy_window(screenWindow);
-        bps_shutdown();
-        screen_destroy_context(screenContext);
-        return -1;
-    }
-#else
-    static screen_display_t screenDisplay;
-    screen_get_window_property_pv(screenWindow, SCREEN_PROPERTY_DISPLAY, (void **)&screenDisplay);
-
-    screen_display_mode_t screenMode;
-    screen_get_display_property_pv(screenDisplay, SCREEN_PROPERTY_MODE, (void**)&screenMode);
-
-    int size[2];
-    screen_get_window_property_iv(screenWindow, SCREEN_PROPERTY_BUFFER_SIZE, size);
-
-    screenResolution[0] = size[0];
-    screenResolution[1] = size[1];
-
-    if ((orientation == 0) || (orientation == 180)) {
-        if (((screenMode.width > screenMode.height) && (size[0] < size[1])) ||
-            ((screenMode.width < screenMode.height) && (size[0] > size[1]))) {
-                screenResolution[1] = size[0];
-                screenResolution[0] = size[1];
-        }
-    } else { // orientation == 90 || orientation == 270
-        if (((screenMode.width > screenMode.height) && (size[0] > size[1])) ||
-            ((screenMode.width < screenMode.height && size[0] < size[1]))) {
-                screenResolution[1] = size[0];
-                screenResolution[0] = size[1];
-        }
-    }
-
-    screen_set_window_property_iv(screenWindow, SCREEN_PROPERTY_ROTATION, &orientation);
-#endif
-
-    rc = screen_set_window_property_iv(screenWindow, SCREEN_PROPERTY_BUFFER_SIZE, screenResolution);
-    if (rc) {
-        SDL_SetError("Cannot resize window buffer: %s", strerror(errno));
-        screen_destroy_window(screenWindow);
-        bps_shutdown();
-        screen_destroy_context(screenContext);
-        return -1;
-    }
-
-    int format = SCREEN_FORMAT_RGBX8888;
-    rc = screen_set_window_property_iv(screenWindow, SCREEN_PROPERTY_FORMAT, &format);
-    if (rc) {
-        SDL_SetError("Cannot set window format: %s", strerror(errno));
-        screen_destroy_window(screenWindow);
-        bps_shutdown();
-        screen_destroy_context(screenContext);
-        return -1;
-    }
-
-    int usage = SCREEN_USAGE_OPENGL_ES1; //FIXME: | SCREEN_USAGE_ROTATION;
-    rc = screen_set_window_property_iv(screenWindow, SCREEN_PROPERTY_USAGE, &usage);
-    if (rc) {
-        SDL_SetError("Cannot set window usage: %s", strerror(errno));
-        screen_destroy_window(screenWindow);
-        bps_shutdown();
-        screen_destroy_context(screenContext);
-        return -1;
-    }
-
-    int bufferCount = 1;
-    rc = screen_create_window_buffers(screenWindow, bufferCount);
-    if (rc) {
-        SDL_SetError("Cannot create window buffer: %s", strerror(errno));
-        screen_destroy_window(screenWindow);
-        bps_shutdown();
-        screen_destroy_context(screenContext);
-        return -1;
-    }
-
-#ifndef __PLAYBOOK__
-    rc = screen_create_window_group(screenWindow, NULL);
-#else
-    snprintf(windowGroup, sizeof(double), "%d", getpid());
-    rc = screen_create_window_group(screenWindow, windowGroup);
-#endif
-    if (rc) {
-        SDL_SetError("Cannot create window group: %s", strerror(errno));
-        screen_destroy_window(screenWindow);
-        bps_shutdown();
-        screen_destroy_context(screenContext);
-        return -1;
-    }
-#ifndef __PLAYBOOK__
-    screen_get_window_property_cv(screenWindow, SCREEN_PROPERTY_GROUP, sizeof(windowGroup), windowGroup);
-#endif
-
-    rc = screen_request_events(screenContext);
-    if (rc) {
-        SDL_SetError("Cannot request screen events: %s", strerror(errno));
-        screen_destroy_window_buffers(screenWindow);
-        screen_destroy_window(screenWindow);
-        bps_shutdown();
-        screen_destroy_context(screenContext);
-        return -1;
-    }
-
-    BlackBerry_SetScreenResolution(screenResolution[0], screenResolution[1], SDL_PIXELFORMAT_RGBX8888);
-
     LOGE("SDL_BlackBerry_Init finished!\n");
 
     return 0;
@@ -290,6 +277,8 @@ int SDL_BlackBerry_Init()
 
 int BlackBerry_SYS_InitAccelerometer()
 {
+    LOGE("BlackBerry_SYS_InitAccelerometer\n");
+
     if (sensor_is_supported(SENSOR_TYPE_GRAVITY)) {
         sensor_set_rate(SENSOR_TYPE_GRAVITY, 25000);
         sensor_set_skip_duplicates(SENSOR_TYPE_GRAVITY, true);
@@ -301,6 +290,8 @@ int BlackBerry_SYS_InitAccelerometer()
 
 int BlackBerry_SYS_InitController()
 {
+    LOGE("BlackBerry_SYS_InitController\n");
+
 #ifndef __PLAYBOOK__
     int deviceCount;
     screen_get_context_property_iv(screenContext, SCREEN_PROPERTY_DEVICE_COUNT, &deviceCount);
@@ -355,7 +346,8 @@ int BlackBerry_SYS_InitController()
                  Handle Events
 *******************************************************************************/
 
-void handleVirtualKeyboardEvent(bps_event_t *bps_event) {
+void handleVirtualKeyboardEvent(bps_event_t *bps_event)
+{
     switch (bps_event_get_code(bps_event)) {
     case VIRTUALKEYBOARD_EVENT_VISIBLE:
         //if (SDL_GetEventState(SDL_TEXTINPUT) != SDL_ENABLE)
@@ -655,6 +647,11 @@ void BlackBerry_SYS_ProcessEvents()
              Functions called by SDL
 *******************************************************************************/
 
+screen_context_t BlackBerry_SYS_GetNativeContext(void)
+{
+    return screenContext;
+}
+
 screen_window_t BlackBerry_SYS_GetNativeWindow(void)
 {
     return screenWindow;
@@ -662,11 +659,19 @@ screen_window_t BlackBerry_SYS_GetNativeWindow(void)
 
 char* BlackBerry_SYS_GetNativeWindowGroup(void)
 {
-    return windowGroup;
+    static char s_window_group_id[16] = "";
+
+    if (s_window_group_id[0] == '\0') {
+        snprintf(s_window_group_id, sizeof(s_window_group_id), "%d", getpid());
+    }
+
+    return s_window_group_id;
 }
 
-void BlackBerry_SYS_ReleaseNativeWindow(screen_window_t native_window)
+void BlackBerry_SYS_ReleaseNativeWindow()
 {
+    LOGE("BlackBerry_SYS_ReleaseNativeWindow\n");
+
     screen_destroy_window_buffers(screenWindow);
     screen_destroy_window(screenWindow);
     screen_stop_events(screenContext);

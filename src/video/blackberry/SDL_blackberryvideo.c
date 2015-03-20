@@ -45,25 +45,7 @@
 static int BlackBerry_VideoInit(_THIS);
 static void BlackBerry_VideoQuit(_THIS);
 
-#include "../SDL_egl.h"
-/* GL functions (SDL_blackberrygl.c) */
-extern SDL_GLContext BlackBerry_GLES_CreateContext(_THIS, SDL_Window * window);
-extern int BlackBerry_GLES_MakeCurrent(_THIS, SDL_Window * window, SDL_GLContext context);
-extern void BlackBerry_GLES_SwapWindow(_THIS, SDL_Window * window);
-extern int BlackBerry_GLES_LoadLibrary(_THIS, const char *path);
-#define BlackBerry_GLES_GetProcAddress SDL_EGL_GetProcAddress
-#define BlackBerry_GLES_UnloadLibrary SDL_EGL_UnloadLibrary
-#define BlackBerry_GLES_SetSwapInterval SDL_EGL_SetSwapInterval
-#define BlackBerry_GLES_GetSwapInterval SDL_EGL_GetSwapInterval
-#define BlackBerry_GLES_DeleteContext SDL_EGL_DeleteContext
-
-/* These are filled in with real values in BlackBerry_SetScreenResolution on init (before SDL_main()) */
-int BlackBerry_ScreenWidth = 0;
-int BlackBerry_ScreenHeight = 0;
-Uint32 BlackBerry_ScreenFormat = SDL_PIXELFORMAT_UNKNOWN;
-
-/* Currently only one window */
-SDL_Window *BlackBerry_Window = NULL;
+#include "SDL_blackberrygl.h"
 
 static int
 BlackBerry_Available(void)
@@ -153,7 +135,7 @@ BlackBerry_VideoInit(_THIS)
 
     SDL_DisplayMode mode;
 
-    mode.format = BlackBerry_ScreenFormat;
+    mode.format = SDL_PIXELFORMAT_RGBX8888;
     mode.w = BlackBerry_ScreenWidth;
     mode.h = BlackBerry_ScreenHeight;
     mode.refresh_rate = 0;
@@ -175,19 +157,6 @@ BlackBerry_VideoInit(_THIS)
 void
 BlackBerry_VideoQuit(_THIS)
 {
-}
-
-/* This function gets called before VideoInit() */
-void
-BlackBerry_SetScreenResolution(int width, int height, Uint32 format)
-{
-    BlackBerry_ScreenWidth = width;
-    BlackBerry_ScreenHeight = height;
-    BlackBerry_ScreenFormat = format;
-
-    if (BlackBerry_Window) {
-        SDL_SendWindowEvent(BlackBerry_Window, SDL_WINDOWEVENT_RESIZED, width, height);
-    }
 }
 
 #endif /* SDL_VIDEO_DRIVER_BLACKBERRY */

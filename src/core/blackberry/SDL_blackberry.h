@@ -35,11 +35,10 @@ extern "C" {
 #include "SDL_power.h"
 #include "SDL_rect.h"
 
-#ifdef __BLACKBERRY_DEBUG__
 #define LOGE(...)  fprintf(stderr,__VA_ARGS__)
-#else
-#define LOGE(...) do {} while (0)
-#endif
+
+extern int BlackBerry_ScreenWidth;
+extern int BlackBerry_ScreenHeight;
 
 extern int SDL_BlackBerry_Init();
 
@@ -53,9 +52,10 @@ extern SDL_bool BlackBerry_SYS_GetControllerInfo(int device_id, int* buttons, in
 extern SDL_bool BlackBerry_SYS_GetControllerValues(int device_id, int* buttons, float* axes);
 extern void BlackBerry_SYS_ShowTextInput(SDL_Rect *inputRect);
 extern void BlackBerry_SYS_HideTextInput();
+extern screen_context_t BlackBerry_SYS_GetNativeContext();
 extern screen_window_t BlackBerry_SYS_GetNativeWindow();
 extern char* BlackBerry_SYS_GetNativeWindowGroup();
-extern void BlackBerry_SYS_ReleaseNativeWindow(screen_window_t native_window);
+extern void BlackBerry_SYS_ReleaseNativeWindow();
 extern void BlackBerry_SYS_ProcessEvents();
 
 /* Clipboard support */
