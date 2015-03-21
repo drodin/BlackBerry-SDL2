@@ -121,6 +121,7 @@ QSA_CheckBuggyCards(_THIS, unsigned long checkfor)
 static void
 QSA_ThreadInit(_THIS)
 {
+#ifndef __BLACKBERRY__
     struct sched_param param;
     int status;
 
@@ -128,6 +129,7 @@ QSA_ThreadInit(_THIS)
     status = SchedGet(0, 0, &param);
     param.sched_priority = param.sched_curpriority + 15;
     status = SchedSet(0, 0, SCHED_NOCHANGE, &param);
+#endif
 }
 
 /* PCM channel parameters initialize function */
@@ -836,12 +838,16 @@ QSA_Init(SDL_AudioDriverImpl * impl)
     impl->LockDevice = NULL;
     impl->UnlockDevice = NULL;
 
-    impl->OnlyHasDefaultOutputDevice = 0;
     impl->ProvidesOwnCallbackThread = 0;
     impl->SkipMixerLock = 0;
     impl->HasCaptureSupport = 1;
+#ifdef __BLACKBERRY__
+    impl->OnlyHasDefaultOutputDevice = 1;
+    impl->OnlyHasDefaultInputDevice = 1;
+#else
     impl->OnlyHasDefaultOutputDevice = 0;
     impl->OnlyHasDefaultInputDevice = 0;
+#endif
 
     /* Check if io-audio manager is running or not */
     status = snd_cards();
